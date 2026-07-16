@@ -307,7 +307,9 @@ impl Chunk {
             heightmap: Mutex::default(),
             x: proto_chunk.x,
             z: proto_chunk.z,
-            dirty: AtomicBool::new(true),
+            // Inherit instead of forcing `true`: a proto that merely round-tripped
+            // through disk must not re-mark the region dirty.
+            dirty: AtomicBool::new(proto_chunk.modified),
             block_ticks: ChunkTickScheduler::default(),
             fluid_ticks: ChunkTickScheduler::from_iter(proto_chunk.fluid_ticks),
             pending_block_entities: Mutex::new(pending_block_entities),

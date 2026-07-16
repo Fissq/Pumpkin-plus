@@ -660,7 +660,12 @@ impl GenerationSchedule {
                     }
                     Chunk::Proto(chunk) => {
                         debug_assert!(!holder.public);
-                        chunks.push((pos, Chunk::Proto(chunk)));
+                        // Protos that never advanced past their on-disk state have
+                        // nothing new to persist; dropping them avoids rewriting
+                        // (and re-reading) the whole region on pure traversal.
+                        if chunk.modified {
+                            chunks.push((pos, Chunk::Proto(chunk)));
+                        }
                         self.chunk_map.remove(&pos);
                     }
                 }
@@ -693,6 +698,7 @@ impl GenerationSchedule {
                     Chunk::Level(sync_chunk) => sync_chunk.is_dirty(),
                     Chunk::Proto(proto) => {
                         save_proto_chunk
+                            && proto.modified
                             && !matches!(
                                 proto.stage,
                                 crate::chunk_system::chunk_state::StagedChunkEnum::Empty

@@ -140,6 +140,11 @@ pub struct ProtoChunk {
     height: u16,
     bottom_y: i8,
     pub stage: StagedChunkEnum,
+    /// Whether this chunk diverged from its on-disk state. `false` for chunks
+    /// deserialized from disk; set on every executed generation stage
+    /// (`Cache::advance`). Unmodified protos are skipped on unload/save so
+    /// reading terrain never rewrites region files.
+    pub modified: bool,
     pub light: ChunkLight,
     pub carving_mask: crate::generation::carver::mask::CarvingMask,
     pub blending_data: Option<crate::generation::blender::blending_data::BlendingData>,
@@ -215,6 +220,7 @@ impl ProtoChunk {
             height,
             bottom_y: dimension.min_y as i8,
             stage: StagedChunkEnum::Empty,
+            modified: true,
             light: ChunkLight {
                 sky_light: (0..section_count)
                     .map(|_| LightContainer::new_empty(0))
@@ -316,6 +322,7 @@ impl ProtoChunk {
         }
 
         proto_chunk.stage = StagedChunkEnum::from(chunk_data.status);
+        proto_chunk.modified = false;
         proto_chunk
     }
 

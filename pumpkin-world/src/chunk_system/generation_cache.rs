@@ -361,6 +361,13 @@ impl Cache {
             Chunk::Proto(chunk) if chunk.stage >= stage => return,
             Chunk::Proto(_) => {}
         }
+        // The cache is built from the stage's write radius, so every proto in it
+        // may be mutated by the step below and must be persisted on unload.
+        for chunk in &mut self.chunks {
+            if let Chunk::Proto(proto) = chunk {
+                proto.modified = true;
+            }
+        }
         match stage {
             StagedChunkEnum::Empty => panic!("empty stage"),
             StagedChunkEnum::StructureStart => match generator {
