@@ -347,6 +347,7 @@ impl Cache {
             chunks: Vec::with_capacity((size * size) as usize),
         }
     }
+    #[expect(clippy::too_many_lines)]
     pub fn advance(
         &mut self,
         stage: StagedChunkEnum,
@@ -368,7 +369,11 @@ impl Cache {
                         .get_proto_chunk_mut()
                         .set_structure_starts(noise_gen);
                 }
-                generator::WorldGenerator::Flat(_) => {}
+                generator::WorldGenerator::Flat(_) => {
+                    // No structures on flat worlds, but the stage must still
+                    // advance or the scheduler redispatches this task forever.
+                    self.chunks[mid].get_proto_chunk_mut().stage = StagedChunkEnum::StructureStart;
+                }
             },
             StagedChunkEnum::StructureReferences => match generator {
                 generator::WorldGenerator::Noise(noise_gen) => {
@@ -376,7 +381,11 @@ impl Cache {
                         .get_proto_chunk_mut()
                         .set_structure_references(noise_gen);
                 }
-                generator::WorldGenerator::Flat(_) => {}
+                generator::WorldGenerator::Flat(_) => {
+                    // Same as StructureStart: keep the stage machine moving.
+                    self.chunks[mid].get_proto_chunk_mut().stage =
+                        StagedChunkEnum::StructureReferences;
+                }
             },
             StagedChunkEnum::Biomes => match generator {
                 generator::WorldGenerator::Noise(noise_gen) => {
