@@ -108,6 +108,20 @@ impl<T> Ord for OrderedTick<T> {
     }
 }
 
+/// Fixed serialization layout for a scheduled tick. Field declaration order
+/// (`i`, `p`, `t`, `x`, `y`, `z`) is the on-disk tag order — a determinism
+/// contract: do not reorder. Serializing via a struct instead of an
+/// `NbtCompound` keeps the hot save path free of per-tick map allocations.
+#[derive(Serialize)]
+struct ScheduledTickNbt {
+    i: String,
+    p: i32,
+    t: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
 impl<T> Serialize for ScheduledTick<T>
 where
     T: ToResourceLocation,
@@ -116,14 +130,15 @@ where
     where
         S: Serializer,
     {
-        let mut nbt = NbtCompound::new();
-        nbt.put_int("x", self.position.0.x);
-        nbt.put_int("y", self.position.0.y);
-        nbt.put_int("z", self.position.0.z);
-        nbt.put_int("t", self.delay as i32);
-        nbt.put_int("p", self.priority as i32);
-        nbt.put_string("i", self.value.to_resource_location());
-        nbt.serialize(serializer)
+        ScheduledTickNbt {
+            i: self.value.to_resource_location(),
+            p: self.priority as i32,
+            t: self.delay as i32,
+            x: self.position.0.x,
+            y: self.position.0.y,
+            z: self.position.0.z,
+        }
+        .serialize(serializer)
     }
 }
 

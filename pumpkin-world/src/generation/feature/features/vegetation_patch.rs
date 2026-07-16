@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 
 use pumpkin_util::{
     math::{position::BlockPos, vector3::Vector3, vertical_surface_type::VerticalSurfaceType},
@@ -75,6 +74,14 @@ impl VegetationPatchFeature {
         !surface.is_empty()
     }
 
+    /// Returns the placed ground positions in column scan order
+    /// (`dx` outer, `dz` inner). Each column contributes at most one
+    /// position, so the Vec is duplicate-free by construction.
+    ///
+    /// The order is a **determinism contract**: `distribute_vegetation`
+    /// consumes RNG per position, so iteration order defines the generated
+    /// blocks. A `HashSet<BlockPos>` here (ASLR-randomized order) used to
+    /// make world generation differ between processes.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn place_ground_patch<T: GenerationCache>(
         &self,
@@ -85,8 +92,8 @@ impl VegetationPatchFeature {
         replaceable: &BlockPredicate,
         x_radius: i32,
         z_radius: i32,
-    ) -> HashSet<BlockPos> {
-        let mut surface = HashSet::new();
+    ) -> Vec<BlockPos> {
+        let mut surface = Vec::new();
 
         // Determine "inwards" and "outwards" directions based on the surface
         let inwards = self.surface_direction();
@@ -154,7 +161,7 @@ impl VegetationPatchFeature {
                         ground_pos,
                         depth,
                     ) {
-                        surface.insert(ground_pos);
+                        surface.push(ground_pos);
                     }
                 }
             }
@@ -203,7 +210,7 @@ impl VegetationPatchFeature {
         min_y: i8,
         height: u16,
         feature_name: pumpkin_data::placed_feature::PlacedFeature,
-        surface: &HashSet<BlockPos>,
+        surface: &[BlockPos],
     ) {
         let opposite_dir = self.surface_direction().opposite();
 

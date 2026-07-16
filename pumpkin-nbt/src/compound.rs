@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use uuid::Uuid;
 
@@ -7,7 +7,7 @@ use crate::deserializer::NbtReadHelper;
 use crate::serializer::NbtWriteHelper;
 use crate::tag::NbtTag;
 use crate::{END_ID, Error, Nbt};
-use std::collections::hash_map::IntoIter;
+use std::collections::btree_map::IntoIter;
 use std::io::ErrorKind;
 
 #[macro_export]
@@ -25,21 +25,28 @@ macro_rules! nbt_compound_tag {
     };
 }
 
-/// Represents a Compound NBT tag, effectively a hash map.
+/// Represents a Compound NBT tag, effectively an ordered map.
 ///
-/// Internally, this uses a `HashMap<String, NbtTag>`, which does not preserve insertion order,
-/// just like Minecraft: Java Edition, but it does mean lookups are O(1).
-///
+/// Internally this uses a `BTreeMap<Box<str>, NbtTag>`, so tags are always
+/// iterated — and therefore serialized — in lexicographic order of their key
+/// bytes. This ordering is a **stability contract**: identical compound
+/// contents must serialize to byte-identical output across processes and
+/// machines (bit-exactness tests rely on it). Do not switch back to a
+/// hash-based map: `std::collections::HashMap`'s iteration order is
+/// randomized per process (ASLR-seeded `RandomState`), which used to leak
+/// into saved chunk NBT. Note this differs from Java Edition, which writes
+/// tags in its own `HashMap` bucket order; matching Java byte-for-byte would
+/// require emulating that order and is out of scope here.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct NbtCompound {
-    pub child_tags: HashMap<Box<str>, NbtTag>,
+    pub child_tags: BTreeMap<Box<str>, NbtTag>,
 }
 
 impl NbtCompound {
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            child_tags: HashMap::new(),
+            child_tags: BTreeMap::new(),
         }
     }
 

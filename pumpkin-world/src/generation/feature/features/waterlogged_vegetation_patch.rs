@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use pumpkin_util::{
     math::position::BlockPos,
     random::{RandomGenerator, RandomImpl},
@@ -70,7 +68,7 @@ impl WaterloggedVegetationPatchFeature {
         replaceable: &crate::generation::block_predicate::BlockPredicate,
         x_radius: i32,
         z_radius: i32,
-    ) -> HashSet<BlockPos> {
+    ) -> Vec<BlockPos> {
         let surface = self.base.place_ground_patch(
             chunk,
             block_registry,
@@ -81,8 +79,10 @@ impl WaterloggedVegetationPatchFeature {
             z_radius,
         );
 
-        // Filter the surface to only include unexposed positions, turning them into water
-        let water_surface: HashSet<BlockPos> = surface
+        // Filter the surface to only include unexposed positions, turning them
+        // into water. Keeps the deterministic column scan order of
+        // place_ground_patch — the vegetation loop consumes RNG per position.
+        let water_surface: Vec<BlockPos> = surface
             .into_iter()
             .filter(|&pos| !is_exposed(chunk, pos))
             .collect();

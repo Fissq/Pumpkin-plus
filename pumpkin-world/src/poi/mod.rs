@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
@@ -70,14 +70,18 @@ pub struct PoiSectionData {
 pub struct PoiChunkData {
     pub data_version: i32,
     /// Sections keyed by Y section coordinate (e.g., "-1", "0", "1", "4")
-    pub sections: HashMap<String, PoiSectionData>,
+    /// `BTreeMap` (lexicographic key order) so identical POI data always
+    /// serializes byte-identically across processes — determinism contract.
+    pub sections: BTreeMap<String, PoiSectionData>,
 }
 
 /// POI data for a single region (32x32 chunks) using MCA format
 #[derive(Debug, Default)]
 pub struct PoiRegion {
     /// Entries indexed by position
-    entries: HashMap<(i32, i32, i32), PoiEntry>,
+    /// `BTreeMap` so record order in saved POI chunks is deterministic
+    /// ((x, y, z) tuple order) — determinism contract.
+    entries: BTreeMap<(i32, i32, i32), PoiEntry>,
     /// Track which chunks are dirty
     dirty_chunks: std::collections::HashSet<(i32, i32)>,
     dirty: bool,
@@ -144,7 +148,7 @@ impl PoiRegion {
 
     /// Group entries by chunk, then create chunk NBT data
     fn get_chunk_data(&self, chunk_x: i32, chunk_z: i32) -> Option<PoiChunkData> {
-        let mut sections: HashMap<String, PoiSectionData> = HashMap::new();
+        let mut sections: BTreeMap<String, PoiSectionData> = BTreeMap::new();
 
         for entry in self.entries.values() {
             let entry_chunk_x = entry.x >> 4;
@@ -219,7 +223,7 @@ impl PoiRegion {
         }
 
         // Build all chunk data
-        let mut chunk_data_map: HashMap<usize, Vec<u8>> = HashMap::new();
+        let mut chunk_data_map: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
 
         // Collect all unique chunks that have entries
         let mut chunks_with_data: std::collections::HashSet<(i32, i32)> =
@@ -379,15 +383,15 @@ pub struct PoiStorage {
     /// Path to the poi folder
     folder: PathBuf,
     /// Loaded regions, keyed by (`region_x`, `region_z`)
-    regions: HashMap<(i32, i32), PoiRegion>,
+    regions: BTreeMap<(i32, i32), PoiRegion>,
 }
 
 impl PoiStorage {
     #[must_use]
-    pub fn new(poi_folder: PathBuf) -> Self {
+    pub const fn new(poi_folder: PathBuf) -> Self {
         Self {
             folder: poi_folder,
-            regions: HashMap::new(),
+            regions: BTreeMap::new(),
         }
     }
 
