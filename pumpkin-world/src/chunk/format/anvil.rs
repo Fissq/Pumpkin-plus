@@ -440,7 +440,13 @@ impl<S: SingleChunkDataSerializer> AnvilChunkFile<S> {
             current_sector += chunk.serialized_data.sector_count();
 
             chunk.serialized_data.write(&mut write).await?;
+
+            #[cfg(any(test, feature = "io-bench-counters"))]
+            crate::chunk::io::counters::add_written(chunk.serialized_data.padded_size() as u64);
         }
+
+        #[cfg(any(test, feature = "io-bench-counters"))]
+        crate::chunk::io::counters::add_written(header.len() as u64);
 
         write.flush().await
     }
@@ -486,6 +492,19 @@ impl<S: SingleChunkDataSerializer> AnvilChunkFile<S> {
         }
 
         write.flush().await?;
+
+        // The tmp file is written from scratch, so bytes written == file length.
+        #[cfg(any(test, feature = "io-bench-counters"))]
+        crate::chunk::io::counters::add_written(
+            (header.len()
+                + self
+                    .chunks_data
+                    .iter()
+                    .flatten()
+                    .map(|chunk| chunk.serialized_data.padded_size())
+                    .sum::<usize>()) as u64,
+        );
+
         tokio::fs::rename(temp_path, path).await?;
         Ok(())
     }

@@ -101,6 +101,8 @@ impl<S: ChunkSerializer<WriteBackend = PathBuf>> ChunkSerializerLazyLoader<S> {
 
         match tokio::fs::read(&self.path).await {
             Ok(bytes) => {
+                #[cfg(any(test, feature = "io-bench-counters"))]
+                super::counters::add_read(bytes.len() as u64);
                 let value = S::read(bytes.into())?;
                 trace!("Successfully read file from disk: {}", self.path.display());
                 Ok(value)

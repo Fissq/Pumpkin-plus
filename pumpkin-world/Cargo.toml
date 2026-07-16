@@ -5,6 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+# Compiles in AtomicU64 byte counters on the chunk IO path
+# (see src/chunk/io/counters.rs); used by benches/chunk_io.rs.
+io-bench-counters = []
+
 [dependencies]
 pumpkin-nbt.workspace = true
 pumpkin-util.workspace = true

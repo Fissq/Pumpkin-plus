@@ -444,6 +444,10 @@ impl<S: SingleChunkDataSerializer> ChunkSerializer for LinearV2File<S> {
         writer.write_all(&SIGNATURE).await?;
         writer.flush().await?;
 
+        // The tmp file is written from scratch, so bytes written == file length.
+        #[cfg(any(test, feature = "io-bench-counters"))]
+        crate::chunk::io::counters::add_written(tokio::fs::metadata(&temp_path).await?.len());
+
         // Atomic rename so a crash during write cannot produce a torn file.
         tokio::fs::rename(temp_path, path).await?;
         Ok(())

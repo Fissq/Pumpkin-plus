@@ -55,6 +55,9 @@ where
         pumpkin_nbt::to_bytes_unnamed(&self.data, &mut bytes)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
+        #[cfg(any(test, feature = "io-bench-counters"))]
+        crate::chunk::io::counters::add_written(bytes.len() as u64);
+
         tokio::fs::write(backend, bytes).await
     }
 
