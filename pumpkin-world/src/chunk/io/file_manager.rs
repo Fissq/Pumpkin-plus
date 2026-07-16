@@ -345,6 +345,10 @@ where
                         }
                     };
 
+                    // Chunks whose dirty flag we cleared this round. Restored on any
+                    // failure below so their changes are retried by the next save
+                    // instead of being lost forever.
+                    let mut cleared: Vec<&Self::Data> = Vec::new();
                     {
                         let mut writer = chunk_serializer.write().await;
                         for chunk in &chunk_locks {
@@ -355,7 +359,16 @@ where
                             chunk.mark_dirty(false);
 
                             if was_dirty {
-                                writer.update_chunk(&**chunk, &self.chunk_config).await?;
+                                if let Err(err) =
+                                    writer.update_chunk(&**chunk, &self.chunk_config).await
+                                {
+                                    chunk.mark_dirty(true);
+                                    for c in &cleared {
+                                        c.mark_dirty(true);
+                                    }
+                                    return Err(err);
+                                }
+                                cleared.push(chunk);
                             }
                         }
                         // Write-lock released here — flush can proceed under a read-lock.
@@ -376,10 +389,14 @@ where
                         {
                             let serializer = chunk_serializer.read().await;
                             debug!("Flushing {} to disk", path.display());
-                            serializer
-                                .write(&path)
-                                .await
-                                .map_err(ChunkWritingError::IoError)?;
+                            if let Err(err) = serializer.write(&path).await {
+                                // Data never reached the disk — re-mark the chunks
+                                // so the next save round retries them.
+                                for c in &cleared {
+                                    c.mark_dirty(true);
+                                }
+                                return Err(ChunkWritingError::IoError(err));
+                            }
                             // Read-lock released here.
                         };
 
